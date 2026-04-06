@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel", "pybind11>=2.11"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wind-turbine-xfoil-opt"
+name = "turbine-blade-moo"
 version = "0.1.0"
 description = "From-scratch wind turbine blade optimization using XFOIL + BEM + NSGA-II."
 readme = "README.md"
@@ -23,10 +23,10 @@ dev = [
 ]
 
 [project.scripts]
-wt-opt = "wind_turbine.pipeline:cli"
+tb-moo = "turbine_blade_moo.pipeline:cli"
 
 [tool.setuptools.packages.find]
-include = ["wind_turbine*"]
+include = ["turbine_blade_moo*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

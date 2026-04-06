@@ -126,7 +126,7 @@ void sample_cl_cd(
     *out_cd = std::max((1.0 - w) * cd_lo + w * cd_hi, 1e-5);
 }
 
-}  // namespace
+}
 
 py::dict evaluate_rotor_cpp(
     double radius_m,

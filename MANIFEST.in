@@ -4,4 +4,4 @@ include requirements.txt
 include requirements-dev.txt
 recursive-include configs *.yaml
 recursive-include notebooks *.ipynb
-recursive-include wind_turbine *.cpp
+recursive-include turbine_blade_moo *.cpp
