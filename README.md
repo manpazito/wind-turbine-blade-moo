@@ -1,106 +1,147 @@
 # Wind Turbine Blade Optimization
 
-This project was built for **ENGIN 26: Three-Dimensional Modeling for Design at UC Berkeley** as a design-and-analysis workflow for wind-turbine blade development. The implementation was constructed from scratch to connect:
+A from-scratch wind-turbine blade optimization workflow that combines:
 
-- 2D airfoil analysis with XFOIL,
-- 3D rotor performance prediction with BEM,
-- and multi-objective optimization (NSGA-II) for design tradeoff exploration.
+- 2D airfoil polar modeling (XFOIL or built-in surrogate backend)
+- 3D rotor performance prediction (BEM)
+- Multi-objective search (NSGA-II style)
 
-The goal was to demonstrate a full modeling pipeline used in engineering design: define parameters, simulate aerodynamic behavior, optimize competing objectives (power vs. load), and justify the final blade geometry with equations and generated evidence.
+It optimizes blade profile, angle of attack, chord/twist scaling, and blade count while tracking aerodynamic tradeoffs such as `Cp`, root bending moment, and solidity.
 
-This project builds a full wind-turbine aerodynamic optimization model from scratch using:
+## What makes this repo GitHub-ready
 
-- `XFOIL` for airfoil polars (`Cl`, `Cd`)
-- `BEM` (Blade Element Momentum) for rotor performance
-- `NSGA-II` style multi-objective optimization
+- Portable quick run that works even if `xfoil` is not installed (surrogate backend)
+- High-fidelity XFOIL mode still available when `xfoil` is installed
+- C++-accelerated BEM solver path (pybind11) with automatic Python fallback
+- CLI entrypoint + YAML configs
+- Automated tests
+- GitHub Actions CI (`pytest` + smoke run)
+- Example notebook demo: `notebooks/demo.ipynb`
 
-It optimizes and justifies:
-
-- blade profile (airfoil)
-- angle of attack
-- twist distribution
-- number of blades
-
-under equations commonly used in wind-turbine research.
-
-## 1) Install
+## Install
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-Make sure `xfoil` is installed and available on your `PATH`.
+For development + notebook tools:
 
-## 2) Run
+```bash
+python -m pip install -e .[dev]
+```
+
+## Python Package Usage
+
+Once installed, use as a package:
+
+```python
+from wind_turbine.config import load_config
+from wind_turbine.pipeline import run_pipeline
+
+cfg = load_config("configs/quick_test.yaml")
+summary = run_pipeline(cfg)
+print(summary["cp"], summary["aero_backend"])
+```
+
+Use the CLI entrypoint:
+
+```bash
+wt-opt --config configs/quick_test.yaml
+```
+
+## C++ Acceleration
+
+- The package includes an optional C++ extension: `wind_turbine._bem_cpp`
+- During install, the build tries to compile it automatically.
+- If compilation is not available on a machine, the package still works via the pure-Python BEM fallback.
+- Runtime selection is automatic; no config switch is required.
+
+## Run
+
+Portable quick demo (works on any machine, no external XFOIL dependency required):
+
+```bash
+python -m wind_turbine --config configs/quick_test.yaml
+```
+
+Default run (auto backend):
 
 ```bash
 python -m wind_turbine --config configs/default.yaml
 ```
 
-Preset run profiles:
+High-accuracy run (requires system `xfoil` installed):
 
 ```bash
-# Super fast smoke test
-python -m wind_turbine --config configs/quick_test.yaml
-
-# High-accuracy (slow, much denser optimization + XFOIL sampling)
 python -m wind_turbine --config configs/high_accuracy.yaml
 ```
 
-## 3) Outputs
+You can also use the installed script: `wt-opt --config configs/quick_test.yaml`
 
-Generated in `outputs/`:
+## Notebook Demo
+
+Open and run:
+
+- `notebooks/demo.ipynb`
+
+```bash
+jupyter notebook notebooks/demo.ipynb
+```
+
+The notebook runs a compact optimization and then visualizes/inspects the generated results.
+
+## Outputs
+
+Each run writes into the configured output directory (for example `outputs_quick/` or `outputs_notebook_demo/`):
 
 - `all_designs.csv`: all evaluated designs
 - `pareto.csv`: Pareto-optimal designs
-- `best_sections.csv`: radial geometry and section aerodynamic states
-- `best_airfoil_coords.csv`: x,y coordinates of selected blade profile (normalized by chord)
-- `local_sensitivity.csv`: local finite-difference sensitivity of each selected parameter
+- `best_sections.csv`: radial section geometry + aerodynamic states
+- `best_airfoil_coords.csv`: selected airfoil profile coordinates
+- `local_sensitivity.csv`: local perturbation sensitivity around selected design
 - `best_geometry.png`: chord and twist distributions
-- `best_airfoil_profile.png`: 2D airfoil/profile plot from x,y coordinates
-- `pareto_cp_vs_moment.png`: Pareto scatter
-- `summary.json`: selected best compromise design
-- `report.md`: equation-based justification for profile, AoA, twist, and blade count
+- `best_airfoil_profile.png`: selected airfoil shape plot
+- `pareto_cp_vs_moment.png`: Pareto scatter (`Cp` vs root moment)
+- `summary.json`: selected compromise design summary
+- `report.md`: equation-based design justification
 
-How `local_sensitivity.csv` works (brief):
+## Backend Modes (`xfoil.backend`)
 
-- It perturbs each selected parameter around the final design and re-runs the same XFOIL+BEM physics.
-- For continuous parameters (`tip_speed_ratio`, `aoa_deg`, `hub_radius_ratio`, `chord_scale`, `twist_scale`) it uses central finite differences.
-- For blade count it uses integer neighboring values.
-- For airfoil it switches to each other candidate profile and reports the tradeoff shift.
-- Reported derivatives (`dcp_dparam`, `droot_moment_dparam`, `dsolidity_dparam`) quantify how strongly each parameter drives performance and load near the chosen point.
-- `impact_tradeoff` ranks which parameter changes most disturb the selected Pareto compromise.
+In YAML config:
 
-## 4) Equations implemented
+- `surrogate`: always use built-in surrogate polar model (fast, portable)
+- `xfoil`: always use system XFOIL executable (`xfoil.executable`)
+- `auto`: use XFOIL if available, else fall back to surrogate
 
-- $\lambda = \Omega R / V_{\infty}$
-- $\phi = \arctan\!\left(\frac{1-a}{\lambda_r(1+a')}\right)$
-- $\alpha = \phi - (\theta + \beta_{\text{pitch}})$
-- $C_n = C_l\cos\phi + C_d\sin\phi$
-- $C_t = C_l\sin\phi - C_d\cos\phi$
-- $a = \frac{1}{\frac{4F\sin^2\phi}{\sigma C_n} + 1}$
-- $a' = \frac{1}{\frac{4F\sin\phi\cos\phi}{\sigma C_t} - 1}$
-- $dT = 0.5\,\rho W^2 BcC_n\,dr$
-- $dQ = 0.5\,\rho W^2 BcC_t r\,dr$
-- $C_p = \frac{P}{0.5\,\rho A V_{\infty}^3}, \quad P = \Omega\int dQ$
-- $\theta(r) = \phi_{\text{des}}(r) - \alpha_{\text{design}} - \beta_{\text{pitch}}$
-- $c(r) \sim \frac{8\pi r\sin\phi_{\text{des}}}{B\,C_{l,\text{des}}\,\lambda_r}$
+`xfoil.fallback_to_surrogate` controls whether runtime XFOIL failures should automatically degrade to surrogate mode.
 
-How these equations justify the final solution (brief):
+## Equations implemented
 
-- They convert each candidate design into physically grounded outputs (`Cp`, thrust/torque, root moment, solidity), not heuristic scores.
-- XFOIL provides $C_l, C_d$; BEM equations propagate those into section loads ($dT, dQ$) and rotor power $C_p$.
-- Twist and chord are justified through $\theta(r)$ and $c(r)$ relations, then validated by the resulting $\alpha(r)$, $a$, $a'$, and integrated performance.
-- Blade count and airfoil are justified by Pareto tradeoffs: maximize aerodynamic performance while limiting load/solidity.
-- The final pick is the Pareto compromise point; `local_sensitivity.csv` confirms which parameters most affect that compromise near the chosen design.
+- `lambda = Omega R / V_inf`
+- `phi = atan((1-a)/(lambda_r(1+a')))`
+- `alpha = phi - (theta + beta_pitch)`
+- `C_n = C_l cos(phi) + C_d sin(phi)`
+- `C_t = C_l sin(phi) - C_d cos(phi)`
+- `a = 1 / ((4F sin^2(phi))/(sigma C_n) + 1)`
+- `a' = 1 / ((4F sin(phi)cos(phi))/(sigma C_t) - 1)`
+- `dT = 0.5 rho W^2 B c C_n dr`
+- `dQ = 0.5 rho W^2 B c C_t r dr`
+- `Cp = P / (0.5 rho A V_inf^3), P = Omega * integral(dQ)`
+- `theta(r) = phi_des(r) - alpha_design - beta_pitch`
+- `c(r) ~ 8 pi r sin(phi_des)/(B Cl_des lambda_r)`
 
-## 5) Notes
+## Tests
 
-- The model is aerodynamic-first. Structural, fatigue, and manufacturing constraints should be added for final engineering design.
-- Configurable ranges are in `configs/default.yaml`.
+```bash
+pytest -q
+```
 
-## 6) Inspiration and Citation
+## Citation
 
-This work is heavily inspired by:
+This project is inspired by:
 
-Lele Li, Weihao Zhang, Ya Li, Chiju Jiang, and Yufan Wang, “Multi-Objective Optimization of Turbine Blade Profiles Based on Multi-Agent Reinforcement Learning,” *Energy Conversion and Management* 297 (2023): 117637, https://doi.org/10.1016/j.enconman.2023.117637.
+Lele Li, Weihao Zhang, Ya Li, Chiju Jiang, and Yufan Wang,
+“Multi-Objective Optimization of Turbine Blade Profiles Based on Multi-Agent Reinforcement Learning,”
+*Energy Conversion and Management* 297 (2023): 117637,
+https://doi.org/10.1016/j.enconman.2023.117637.
