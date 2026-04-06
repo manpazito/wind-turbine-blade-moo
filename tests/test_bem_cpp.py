@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 import pytest
-from turbine_blade_moo import bem
-from turbine_blade_moo.config import DesignSpaceConfig, RotorConfig
-from turbine_blade_moo.xfoil import PolarPoint
+from wind_turbine_blade_moo import bem
+from wind_turbine_blade_moo.config import DesignSpaceConfig, RotorConfig
+from wind_turbine_blade_moo.xfoil import PolarPoint
 
 class DummyPolarsWithTables:
 

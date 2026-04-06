@@ -1,9 +1,9 @@
 import math
 import numpy as np
-from turbine_blade_moo.config import DesignSpaceConfig, RotorConfig
-from turbine_blade_moo.xfoil import XfoilPolarDatabase
+from wind_turbine_blade_moo.config import DesignSpaceConfig, RotorConfig
+from wind_turbine_blade_moo.xfoil import XfoilPolarDatabase
 try:
-    from turbine_blade_moo._bem_cpp import evaluate_rotor_cpp as _evaluate_rotor_cpp_impl
+    from wind_turbine_blade_moo._bem_cpp import evaluate_rotor_cpp as _evaluate_rotor_cpp_impl
 except Exception:
     _evaluate_rotor_cpp_impl = None
 

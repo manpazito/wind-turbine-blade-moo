@@ -7,7 +7,7 @@ import warnings
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from turbine_blade_moo.config import XfoilConfig
+from wind_turbine_blade_moo.config import XfoilConfig
 
 class PolarPoint:
 

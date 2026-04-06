@@ -31,4 +31,4 @@ jobs:
         run: pytest -q
 
       - name: Run smoke pipeline
-        run: python -m turbine_blade_moo --config configs/quick_test.yaml
+        run: python -m wind_turbine_blade_moo --config configs/quick_test.yaml

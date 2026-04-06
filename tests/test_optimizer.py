@@ -1,6 +1,6 @@
-from turbine_blade_moo.config import DesignSpaceConfig, OptimizerConfig, RotorConfig
-from turbine_blade_moo.optimizer import run_nsga2
-from turbine_blade_moo.xfoil import PolarPoint
+from wind_turbine_blade_moo.config import DesignSpaceConfig, OptimizerConfig, RotorConfig
+from wind_turbine_blade_moo.optimizer import run_nsga2
+from wind_turbine_blade_moo.xfoil import PolarPoint
 
 class DummyPolars:
 

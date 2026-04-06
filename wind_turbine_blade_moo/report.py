@@ -1,9 +1,9 @@
 import math
 from pathlib import Path
 import pandas as pd
-from turbine_blade_moo.config import Config
-from turbine_blade_moo.optimizer import OptimizationOutcome
-from turbine_blade_moo.xfoil import XfoilPolarDatabase
+from wind_turbine_blade_moo.config import Config
+from wind_turbine_blade_moo.optimizer import OptimizationOutcome
+from wind_turbine_blade_moo.xfoil import XfoilPolarDatabase
 
 def _fmt(value, digits=4):
     if not math.isfinite(value):

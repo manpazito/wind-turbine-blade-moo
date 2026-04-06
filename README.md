@@ -43,15 +43,15 @@ The framework is exposed both as a command-line workflow and a Python API.
 
 ```bash
 python -m pip install -e .
-python -m turbine_blade_moo --config configs/quick_test.yaml
-tb-moo --config configs/quick_test.yaml
+python -m wind_turbine_blade_moo --config configs/quick_test.yaml
+wtb-moo --config configs/quick_test.yaml
 ```
 
 **Python API**
 
 ```python
-from turbine_blade_moo.config import load_config
-from turbine_blade_moo.pipeline import run_pipeline
+from wind_turbine_blade_moo.config import load_config
+from wind_turbine_blade_moo.pipeline import run_pipeline
 
 cfg = load_config("configs/quick_test.yaml")
 summary = run_pipeline(cfg)

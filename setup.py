@@ -18,7 +18,7 @@ ext_modules = []
 cmdclass = {}
 try:
     from pybind11.setup_helpers import Pybind11Extension
-    ext_modules = [Pybind11Extension('turbine_blade_moo._bem_cpp', ['turbine_blade_moo/_bem_cpp.cpp'], cxx_std=17)]
+    ext_modules = [Pybind11Extension('wind_turbine_blade_moo._bem_cpp', ['wind_turbine_blade_moo/_bem_cpp.cpp'], cxx_std=17)]
     cmdclass = {'build_ext': OptionalBuildExt}
 except Exception:
     ext_modules = []

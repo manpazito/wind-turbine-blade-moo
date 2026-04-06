@@ -1,9 +1,9 @@
 import math
 import numpy as np
 import pandas as pd
-from turbine_blade_moo.bem import RotorPerformance, design_blade_geometry, evaluate_rotor
-from turbine_blade_moo.config import DesignSpaceConfig, OptimizerConfig, RotorConfig
-from turbine_blade_moo.xfoil import XfoilPolarDatabase
+from wind_turbine_blade_moo.bem import RotorPerformance, design_blade_geometry, evaluate_rotor
+from wind_turbine_blade_moo.config import DesignSpaceConfig, OptimizerConfig, RotorConfig
+from wind_turbine_blade_moo.xfoil import XfoilPolarDatabase
 
 class DesignVector:
 

@@ -13,5 +13,5 @@ htmlcov/
 build/
 dist/
 *.egg-info/
-turbine_blade_moo/_bem_cpp*.so
-turbine_blade_moo/_bem_cpp*.pyd
+wind_turbine_blade_moo/_bem_cpp*.so
+wind_turbine_blade_moo/_bem_cpp*.pyd

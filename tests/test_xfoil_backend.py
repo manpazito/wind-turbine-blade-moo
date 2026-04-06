@@ -1,7 +1,7 @@
 import math
 import pytest
-from turbine_blade_moo.config import XfoilConfig
-from turbine_blade_moo.xfoil import XfoilPolarDatabase
+from wind_turbine_blade_moo.config import XfoilConfig
+from wind_turbine_blade_moo.xfoil import XfoilPolarDatabase
 
 def test_surrogate_backend_generates_polars_and_coordinates(tmp_path):
     cfg = XfoilConfig(backend='surrogate', reynolds_bins=[120000, 300000, 900000], alpha_start_deg=-5.0, alpha_end_deg=14.0, alpha_step_deg=1.0)

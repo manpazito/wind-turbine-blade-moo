@@ -6,11 +6,11 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from turbine_blade_moo.config import Config, load_config
-from turbine_blade_moo.optimizer import evaluate_design, run_nsga2, to_dataframe
-from turbine_blade_moo.plotting import TAB10_COLORS, VIRIDIS_CMAP, apply_publication_style, style_axis
-from turbine_blade_moo.report import build_report
-from turbine_blade_moo.xfoil import XfoilPolarDatabase
+from wind_turbine_blade_moo.config import Config, load_config
+from wind_turbine_blade_moo.optimizer import evaluate_design, run_nsga2, to_dataframe
+from wind_turbine_blade_moo.plotting import TAB10_COLORS, VIRIDIS_CMAP, apply_publication_style, style_axis
+from wind_turbine_blade_moo.report import build_report
+from wind_turbine_blade_moo.xfoil import XfoilPolarDatabase
 apply_publication_style()
 
 def _section_dataframe(outcome, radius_m):

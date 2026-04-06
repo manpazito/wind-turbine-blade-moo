@@ -1,6 +1,6 @@
-from turbine_blade_moo.bem import design_blade_geometry, evaluate_rotor
-from turbine_blade_moo.config import DesignSpaceConfig, RotorConfig
-from turbine_blade_moo.xfoil import PolarPoint
+from wind_turbine_blade_moo.bem import design_blade_geometry, evaluate_rotor
+from wind_turbine_blade_moo.config import DesignSpaceConfig, RotorConfig
+from wind_turbine_blade_moo.xfoil import PolarPoint
 
 class DummyPolars:
 
