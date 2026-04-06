@@ -153,6 +153,7 @@ The framework is exposed both as a command-line workflow and a Python API.
 **CLI execution**
 
 ```bash
+python -m venv .venv
 python -m pip install -e .
 python -m wind_turbine_blade_moo --config configs/quick_test.yaml
 wtb-moo --config configs/quick_test.yaml
