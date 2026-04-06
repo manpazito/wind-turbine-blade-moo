@@ -334,6 +334,7 @@ def run_pipeline(config: Config) -> dict[str, object]:
     build_report(config=config, outcome=outcome, polar_db=polar_db, output_path=report_md)
 
     summary = {
+        "aero_backend": polar_db.backend,
         "airfoil": f"NACA {best.airfoil}",
         "blades": best.design.blades,
         "tip_speed_ratio": best.design.tip_speed_ratio,

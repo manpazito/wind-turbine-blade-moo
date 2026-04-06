@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import math
 import re
+import shutil
 import subprocess
 import tempfile
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,8 +34,35 @@ def _sanitize_airfoil_name(name: str) -> str:
     return cleaned.strip("_").lower() or "airfoil"
 
 
+def _airfoil_digits(airfoil: str) -> str:
+    return "".join(ch for ch in airfoil if ch.isdigit())
+
+
+def _airfoil_shape_params(airfoil: str) -> tuple[float, float, float]:
+    """
+    Return (m, p, t) where:
+      m = max camber ratio
+      p = camber position ratio
+      t = max thickness ratio
+    """
+    digits = _airfoil_digits(airfoil)
+    if len(digits) >= 4:
+        t = max(0.06, min(int(digits[-2:]) / 100.0, 0.24))
+        m = max(0.0, min(int(digits[0]) / 100.0, 0.09))
+        p_raw = int(digits[1])
+        p = p_raw / 10.0 if p_raw > 0 else 0.4
+        p = max(0.1, min(p, 0.9))
+        return m, p, t
+
+    if len(digits) >= 2:
+        t = max(0.06, min(int(digits[-2:]) / 100.0, 0.24))
+        return 0.02, 0.4, t
+
+    return 0.02, 0.4, 0.12
+
+
 class XfoilPolarDatabase:
-    """XFOIL runner and on-disk polar cache."""
+    """XFOIL runner with on-disk cache and a built-in surrogate fallback backend."""
 
     def __init__(self, config: XfoilConfig, cache_dir: str | Path) -> None:
         self.cfg = config
@@ -42,6 +71,15 @@ class XfoilPolarDatabase:
         self._polar_cache: dict[tuple[str, float], pd.DataFrame] = {}
         self._coords_cache: dict[str, pd.DataFrame] = {}
         self._sorted_re = sorted(float(v) for v in self.cfg.reynolds_bins)
+        self._backend = self._resolve_backend()
+
+    @property
+    def backend(self) -> str:
+        return self._backend
+
+    @property
+    def reynolds_bins(self) -> tuple[float, ...]:
+        return tuple(self._sorted_re)
 
     def prepare(self, airfoils: list[str]) -> None:
         for af in airfoils:
@@ -82,7 +120,7 @@ class XfoilPolarDatabase:
         if cache_file.exists():
             coords = pd.read_csv(cache_file)
         else:
-            coords = self._run_xfoil_coordinates(airfoil)
+            coords = self._generate_coordinates(airfoil)
             coords.to_csv(cache_file, index=False)
 
         coords = coords.reset_index(drop=True)
@@ -108,6 +146,38 @@ class XfoilPolarDatabase:
         log_re = math.log(max(reynolds, 1.0))
         return min(self._sorted_re, key=lambda v: abs(math.log(v) - log_re))
 
+    def _resolve_backend(self) -> str:
+        requested = str(self.cfg.backend).strip().lower()
+        has_exec = shutil.which(self.cfg.executable) is not None
+
+        if requested == "surrogate":
+            return "surrogate"
+
+        if requested == "xfoil":
+            if has_exec:
+                return "xfoil"
+            if self.cfg.fallback_to_surrogate:
+                self._warn(
+                    "XFOIL executable was not found. Falling back to built-in surrogate backend; "
+                    "results are useful for demos but lower-fidelity than real XFOIL polars."
+                )
+                return "surrogate"
+            raise RuntimeError(
+                f"XFOIL backend requested, but executable '{self.cfg.executable}' was not found on PATH."
+            )
+
+        # auto
+        if has_exec:
+            return "xfoil"
+        self._warn(
+            "XFOIL executable was not found. Using built-in surrogate backend; "
+            "install XFOIL for higher-fidelity aerodynamic polars."
+        )
+        return "surrogate"
+
+    def _warn(self, msg: str) -> None:
+        warnings.warn(msg, RuntimeWarning, stacklevel=2)
+
     def _load_or_generate(self, airfoil: str, re_bin: float) -> pd.DataFrame:
         key = (airfoil, float(re_bin))
         if key in self._polar_cache:
@@ -117,13 +187,115 @@ class XfoilPolarDatabase:
         if cache_file.exists():
             polar = pd.read_csv(cache_file)
         else:
-            polar = self._run_xfoil(airfoil=airfoil, reynolds=re_bin)
+            if self._backend == "surrogate":
+                polar = self._surrogate_polar(airfoil=airfoil, reynolds=re_bin)
+            else:
+                try:
+                    polar = self._run_xfoil(airfoil=airfoil, reynolds=re_bin)
+                except Exception as exc:
+                    if not self.cfg.fallback_to_surrogate:
+                        raise
+                    self._warn(
+                        "XFOIL failed for this run and fallback is enabled. "
+                        f"Using surrogate polar for airfoil={airfoil}, Re={re_bin:.0f}. "
+                        f"Original error: {exc}"
+                    )
+                    polar = self._surrogate_polar(airfoil=airfoil, reynolds=re_bin)
             polar.to_csv(cache_file, index=False)
+
         polar = polar.sort_values("alpha").drop_duplicates("alpha").reset_index(drop=True)
         if polar.empty:
-            raise RuntimeError(f"XFOIL returned empty polar for {airfoil} @ Re={re_bin:.0f}")
+            raise RuntimeError(f"Aerodynamic model returned empty polar for {airfoil} @ Re={re_bin:.0f}")
         self._polar_cache[key] = polar
         return polar
+
+    def _generate_coordinates(self, airfoil: str) -> pd.DataFrame:
+        airfoil_path = Path(airfoil).expanduser()
+        if airfoil_path.exists() and airfoil_path.is_file():
+            parsed = self._parse_coords_file(airfoil_path)
+            if not parsed.empty:
+                return parsed
+
+        if self._backend == "surrogate":
+            return self._surrogate_coordinates(airfoil)
+
+        try:
+            return self._run_xfoil_coordinates(airfoil)
+        except Exception as exc:
+            if not self.cfg.fallback_to_surrogate:
+                raise
+            self._warn(
+                "XFOIL coordinate export failed and fallback is enabled. "
+                f"Using surrogate coordinates for airfoil={airfoil}. Original error: {exc}"
+            )
+            return self._surrogate_coordinates(airfoil)
+
+    def _surrogate_polar(self, airfoil: str, reynolds: float) -> pd.DataFrame:
+        m, _p, t = _airfoil_shape_params(airfoil)
+        alphas = np.arange(
+            self.cfg.alpha_start_deg,
+            self.cfg.alpha_end_deg + 0.5 * self.cfg.alpha_step_deg,
+            self.cfg.alpha_step_deg,
+            dtype=float,
+        )
+        if alphas.size == 0:
+            alphas = np.array([self.cfg.alpha_start_deg, self.cfg.alpha_end_deg], dtype=float)
+
+        # Mild shape and Reynolds dependence; designed for stability and smooth interpolation.
+        re_factor = (max(reynolds, 8e4) / 3.0e5) ** 0.16
+        cl_slope = 2.0 * math.pi * (1.0 - 0.12 * (t - 0.12))
+        cl_max = max(0.9, 1.15 + 6.5 * m + 0.8 * (0.14 - t))
+        stall_alpha = max(9.0, 12.5 + 1.4 * (0.12 - t) / 0.04)
+
+        rows: list[tuple[float, float, float]] = []
+        for alpha in alphas:
+            alpha_bias = alpha + 42.0 * m
+            cl_lin = cl_slope * math.radians(alpha_bias)
+            cl = cl_max * math.tanh(cl_lin / max(cl_max, 1e-6))
+
+            stall_soft = 1.0 + (abs(alpha) / max(stall_alpha, 1e-6)) ** 4
+            cl /= stall_soft ** 0.09
+
+            cd0 = 0.0075 * (1.0 / max(re_factor, 0.35))
+            cd0 += 0.014 * (t - 0.11) ** 2
+            cd0 += 0.020 * (m - 0.02) ** 2
+            k = 0.011 + 0.018 * max(0.0, 0.13 - t)
+            cd = cd0 + k * cl * cl + 0.0014 * (alpha / 18.0) ** 4
+            rows.append((float(alpha), float(cl), float(max(cd, 1e-5))))
+
+        return pd.DataFrame(rows, columns=["alpha", "cl", "cd"])
+
+    def _surrogate_coordinates(self, airfoil: str) -> pd.DataFrame:
+        m, p, t = _airfoil_shape_params(airfoil)
+        beta = np.linspace(0.0, math.pi, 161)
+        x = 0.5 * (1.0 - np.cos(beta))
+
+        yt = 5.0 * t * (
+            0.2969 * np.sqrt(np.maximum(x, 1e-8))
+            - 0.1260 * x
+            - 0.3516 * x**2
+            + 0.2843 * x**3
+            - 0.1015 * x**4
+        )
+
+        yc = np.zeros_like(x)
+        dyc_dx = np.zeros_like(x)
+        if m > 1e-9 and 1e-6 < p < 1.0 - 1e-6:
+            mask = x < p
+            yc[mask] = (m / (p**2)) * (2.0 * p * x[mask] - x[mask] ** 2)
+            yc[~mask] = (m / ((1.0 - p) ** 2)) * ((1.0 - 2.0 * p) + 2.0 * p * x[~mask] - x[~mask] ** 2)
+            dyc_dx[mask] = (2.0 * m / (p**2)) * (p - x[mask])
+            dyc_dx[~mask] = (2.0 * m / ((1.0 - p) ** 2)) * (p - x[~mask])
+
+        theta = np.arctan(dyc_dx)
+        xu = x - yt * np.sin(theta)
+        yu = yc + yt * np.cos(theta)
+        xl = x + yt * np.sin(theta)
+        yl = yc - yt * np.cos(theta)
+
+        x_coords = np.concatenate([xu[::-1], xl[1:]])
+        y_coords = np.concatenate([yu[::-1], yl[1:]])
+        return pd.DataFrame({"x": x_coords, "y": y_coords})
 
     def _run_xfoil(self, airfoil: str, reynolds: float) -> pd.DataFrame:
         with tempfile.TemporaryDirectory(prefix="xfoil_run_") as tmpdir:

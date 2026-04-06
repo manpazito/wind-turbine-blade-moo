@@ -46,6 +46,8 @@ class OptimizerConfig:
 @dataclass(frozen=True)
 class XfoilConfig:
     executable: str = "xfoil"
+    backend: str = "auto"
+    fallback_to_surrogate: bool = True
     reynolds_bins: list[float] = field(
         default_factory=lambda: [150000, 300000, 600000, 1000000, 1800000, 3000000]
     )
@@ -128,14 +130,33 @@ def load_config(path: str | Path) -> Config:
         raise ValueError("`optimizer.population_size` must be >= 8.")
     if optimizer.generations < 1:
         raise ValueError("`optimizer.generations` must be >= 1.")
+    backend = str(xfoil.backend).strip().lower()
+    if backend not in {"auto", "xfoil", "surrogate"}:
+        raise ValueError("`xfoil.backend` must be one of: auto, xfoil, surrogate.")
     if not xfoil.reynolds_bins:
         raise ValueError("`xfoil.reynolds_bins` must not be empty.")
+    if any(float(v) <= 0.0 for v in xfoil.reynolds_bins):
+        raise ValueError("`xfoil.reynolds_bins` values must all be > 0.")
     if xfoil.alpha_step_deg <= 0:
         raise ValueError("`xfoil.alpha_step_deg` must be > 0.")
+    if xfoil.alpha_end_deg <= xfoil.alpha_start_deg:
+        raise ValueError("`xfoil.alpha_end_deg` must be greater than `xfoil.alpha_start_deg`.")
 
     out_dir = Path(project.output_dir)
     if not out_dir.is_absolute():
         out_dir = (Path.cwd() / out_dir).resolve()
 
     project = ProjectConfig(output_dir=out_dir, random_seed=int(project.random_seed))
+    xfoil = XfoilConfig(
+        executable=str(xfoil.executable),
+        backend=backend,
+        fallback_to_surrogate=bool(xfoil.fallback_to_surrogate),
+        reynolds_bins=sorted(float(v) for v in xfoil.reynolds_bins),
+        alpha_start_deg=float(xfoil.alpha_start_deg),
+        alpha_end_deg=float(xfoil.alpha_end_deg),
+        alpha_step_deg=float(xfoil.alpha_step_deg),
+        ncrit=float(xfoil.ncrit),
+        max_iter=int(xfoil.max_iter),
+        timeout_s=float(xfoil.timeout_s),
+    )
     return Config(project=project, rotor=rotor, design_space=design_space, optimizer=optimizer, xfoil=xfoil)

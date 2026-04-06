@@ -37,6 +37,8 @@ optimizer:
 
 xfoil:
   executable: xfoil
+  backend: auto
+  fallback_to_surrogate: true
   reynolds_bins:
     - 150000
     - 300000
