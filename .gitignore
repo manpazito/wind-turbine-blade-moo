@@ -1,2 +1,17 @@
 __pycache__/
+*.py[cod]
+*$py.class
 outputs*/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+.ipynb_checkpoints/
+.venv/
+.DS_Store
+build/
+dist/
+*.egg-info/
+wind_turbine/_bem_cpp*.so
+wind_turbine/_bem_cpp*.pyd
